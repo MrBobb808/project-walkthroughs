@@ -182,11 +182,13 @@ button:focus-visible, [tabindex]:focus-visible {
   width: var(--paper-w);
   height: var(--paper-h);
   position: relative;
+  -webkit-perspective: calc(var(--paper-w) * 2.4);
   perspective: calc(var(--paper-w) * 2.4);
   perspective-origin: 50% 46%;
 }
 .pivot {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -205,6 +207,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .book {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
   font-size: calc(var(--paper-w) / 100); /* 1em = 1% of open sheet width */
@@ -217,6 +220,7 @@ button:focus-visible, [tabindex]:focus-visible {
 .panel {
   position: absolute; top: 0; height: 100%;
   width: calc(100% / 3);
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -226,6 +230,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .bend {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -236,20 +241,37 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .face {
   position: absolute; inset: 0;
+  /* isolate: a front face has no transform of its own, so without this it never
+     forms its own stacking context — its z-index:auto children (texture, photos,
+     badges) would escape and interleave with the neighboring face/panel, which is
+     what was reading as pages "ghosting" through one another. */
+  isolation: isolate;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  overflow: hidden;
-  padding: 2.6em 2.1em;
-  display: flex; flex-direction: column;
   /* paper grain + soft edge vignette, layered under each face's own color */
   background-blend-mode: normal;
 }
 .face.back { transform: rotateY(180deg); }
 
-/* subtle paper texture on every face */
+/* Real content lives in this inner, non-rotated wrapper rather than directly in
+   .face. WebKit/Safari has a long-standing bug where overflow other than
+   visible on the SAME element as backface-visibility:hidden breaks backface
+   culling, letting the hidden face show through — mirrored, since you're
+   seeing the front content from behind. Keeping overflow:hidden (needed to
+   clip the bleeding photos/torn edges) off the rotated element avoids it. */
+.face-clip {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 2.6em 2.1em;
+  display: flex; flex-direction: column;
+}
+
+/* subtle paper texture on every face — no z-index: as the first painted layer
+   it must stay beneath the real content, not float above it (see isolation note). */
 .face::before {
   content: "";
-  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  position: absolute; inset: 0; pointer-events: none;
   background-image:
     repeating-linear-gradient(93deg, rgba(255,255,255,.05) 0 2px, transparent 2px 5px),
     repeating-linear-gradient(2deg, rgba(120,90,20,.028) 0 3px, transparent 3px 7px),
@@ -536,27 +558,45 @@ button:focus-visible, [tabindex]:focus-visible {
     radial-gradient(circle at 8% 90%, rgba(124,201,240,.4), transparent 24%);
   align-items: center; text-align: center;
 }
-.cover-ring { position: relative; width: 21em; height: 21em; flex: 0 0 auto; margin-top: .4em; }
+.cover-ring { position: relative; width: 14em; height: 14em; flex: 0 0 auto; margin-top: .2em; }
 .cover-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; animation: ringSpin 60s linear infinite; }
 @keyframes ringSpin { to { transform: rotate(360deg); } }
 .ring-text {
-  font-family: var(--font-display); font-weight: 800; font-size: 20.5px;
+  font-family: var(--font-display); font-weight: 800; font-size: 14px;
   fill: var(--orange);
-  stroke: #fff; stroke-width: 4px; paint-order: stroke;
-  letter-spacing: .5px;
+  stroke: #fff; stroke-width: 3px; paint-order: stroke;
+  letter-spacing: .3px;
 }
 .cover-emoji {
   position: absolute; inset: 0; display: grid; place-items: center;
-  font-size: 7.5em; filter: drop-shadow(0 .1em .15em rgba(30,52,104,.28));
+  font-size: 5em; filter: drop-shadow(0 .1em .15em rgba(30,52,104,.28));
 }
+
+.app-process {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center;
+  gap: .55em; width: 100%; max-width: 27em;
+  margin-top: .3em;
+}
+.app-heading {
+  display: inline-block;
+  background: var(--gold); color: var(--ink);
+  font-family: var(--font-display); font-weight: 800; font-size: 1.3em;
+  padding: .32em .85em; border-radius: .35em;
+  transform: rotate(-1.2deg);
+  box-shadow: 0 .2em .5em rgba(90,70,20,.28);
+}
+.app-list { width: 100%; text-align: left; padding-left: .3em; }
+.app-list li { font-size: 1.05em; }
+
 .cover-photo {
-  width: 108%; flex: 1 1 auto; min-height: 0; margin: .6em -2.1em 0;
+  width: 108%; flex: 1 1 auto; min-height: 8em; margin: .5em -2.1em 0;
   mask-image: linear-gradient(to bottom, transparent, black 15%);
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%);
 }
 .cover-cta {
   position: relative; z-index: 2; width: 100%;
-  margin-top: -11em;
+  margin-top: -9.5em;
   display: flex; flex-direction: column; align-items: center; gap: .6em;
 }
 .apply-pill {
@@ -667,6 +707,23 @@ button:focus-visible, [tabindex]:focus-visible {
 .control[aria-pressed="true"] {
   background: var(--navy); color: #fff; border-color: var(--navy);
 }
+.zoom-rocker {
+  display: flex; align-items: stretch;
+  border-radius: 999px; overflow: hidden;
+  background: rgba(255,255,255,.75); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 6px 16px rgba(30,52,104,.12);
+}
+.zoom-btn {
+  display: grid; place-items: center;
+  width: 38px; height: 38px;
+  font-size: 17px; font-weight: 900; line-height: 1; color: var(--navy);
+  transition: background .18s;
+}
+.zoom-btn:first-child { border-right: 1px solid rgba(30,52,104,.14); }
+.zoom-btn:hover { background: rgba(30,52,104,.1); }
+.zoom-btn:active { background: rgba(30,52,104,.18); }
+
 .more-wrap { position: relative; }
 .more-menu {
   position: absolute; right: 0; bottom: calc(100% + 8px);

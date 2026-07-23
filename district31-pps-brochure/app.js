@@ -24,6 +24,12 @@ const smooth = (t, a, b) => {
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
+// setPointerCapture can throw (InvalidPointerId) if the pointer already ended
+// in a race — most likely with fast multi-touch, e.g. mid-pinch.
+function safeCapture(el, pointerId) {
+  try { el.setPointerCapture(pointerId); } catch { /* pointer already gone */ }
+}
+
 /* ---------------- spring ---------------- */
 
 class Spring {
@@ -97,6 +103,19 @@ if (!supports3D) {
   $("#intro").classList.add("hide");
 }
 
+/* ---------------- wrap face content for Safari backface-visibility fix ---------------- */
+
+// Moves each face's markup into an inner .face-clip wrapper (see the CSS
+// comment above .face-clip) so overflow:hidden never sits on the same
+// rotated, backface-hidden element — a combination WebKit fails to cull
+// correctly, letting the "hidden" back of a folded panel show through.
+for (const face of $$(".face")) {
+  const clip = document.createElement("div");
+  clip.className = "face-clip";
+  while (face.firstChild) clip.appendChild(face.firstChild);
+  face.appendChild(clip);
+}
+
 /* ---------------- inject dynamic shading layers ---------------- */
 
 for (const face of $$(".panel.left .face, .panel.right .face")) {
@@ -118,6 +137,8 @@ for (const cls of ["cast-left", "cast-right"]) {
 /* ---------------- state ---------------- */
 
 const FOLD_DEG = 178.7; // slightly under 180 so folded panels never z-fight
+const MIN_USER_ZOOM = 0.6;
+const MAX_USER_ZOOM = 2.2;
 
 const state = {
   started: false,
@@ -132,6 +153,7 @@ const state = {
   yaw: new Spring(-24, 60, 1),
   pitch: new Spring(7, 60, 1),
   zoom: new Spring(1, 55, 0.85),
+  userZoom: new Spring(1, 70, 0.9), // manual zoom: wheel, pinch, +/- buttons
   camX: new Spring(0, 45, 0.95),
   parX: new Spring(0, 80, 1),
   parY: new Spring(0, 80, 1),
@@ -142,6 +164,7 @@ const state = {
   opened: false, // opened at least once (hides hint)
   touring: false,
   tourToken: 0,
+  pinching: false,
 };
 
 /* ---------------- fit to viewport ---------------- */
@@ -240,6 +263,7 @@ function frame(now) {
   state.yaw.step(dt);
   state.pitch.step(dt);
   state.zoom.step(dt);
+  state.userZoom.step(dt);
   state.camX.step(dt);
   state.parX.step(dt);
   state.parY.step(dt);
@@ -257,6 +281,15 @@ function frame(now) {
   panelR.style.transform =
     `translate3d(0,0,${liftR.toFixed(2)}px) rotateY(${aR.toFixed(3)}deg) rotateZ(${(fR * 0.4).toFixed(3)}deg)`;
 
+  // When fully closed, panelL's folded-back face and the cover both rotate to
+  // a near-front-facing angle and land on the same screen position — a couple
+  // of px of translateZ separation isn't a reliable way to occlude one with
+  // the other across browsers/GPUs. Explicitly fade panelL out right at the
+  // very end of closing (only when BOTH are nearly folded, so this never
+  // touches the "flap" reveal, where panelL is meant to be seen on its own).
+  const bothClosed = smooth(fL, 0.85, 1) * smooth(fR, 0.85, 1);
+  panelL.style.opacity = (1 - bothClosed).toFixed(3);
+
   // paper flex: velocity lag + a slight resting curl while folded
   const bL = clamp(-state.foldL.v * 7, -6, 6) + fL * 2.0;
   const bR = clamp(state.foldR.v * 7, -6, 6) - fR * 2.6;
@@ -273,7 +306,7 @@ function frame(now) {
     `translateX(${state.camX.x.toFixed(2)}px) ` +
     `rotateX(${(state.pitch.x + state.parY.x).toFixed(3)}deg) ` +
     `rotateY(${(state.yaw.x + state.parX.x).toFixed(3)}deg) ` +
-    `scale(${state.zoom.x.toFixed(4)})`;
+    `scale(${(state.zoom.x * state.userZoom.x).toFixed(4)})`;
 
   // dynamic shading + contact shadow
   const openness = 1 - (fL + fR) / 2;
@@ -376,6 +409,10 @@ function resetView() {
   state.camX.target = 0;
   state.parX.snap(0);
   state.parY.snap(0);
+  state.userZoom.target = 1;
+}
+function zoomBy(factor) {
+  state.userZoom.target = clamp(state.userZoom.target * factor, MIN_USER_ZOOM, MAX_USER_ZOOM);
 }
 
 /* ---------------- intro ---------------- */
@@ -401,7 +438,7 @@ btnStart.addEventListener("click", () => {
 let drag = null;
 
 book.addEventListener("pointerdown", (e) => {
-  if (e.target.closest(".hotspot") || state.touring) return;
+  if (e.target.closest(".hotspot") || state.touring || state.pinching) return;
   drag = {
     id: e.pointerId,
     x0: e.clientX,
@@ -412,7 +449,7 @@ book.addEventListener("pointerdown", (e) => {
     lastT: performance.now(),
     vel: 0,
   };
-  book.setPointerCapture(e.pointerId);
+  safeCapture(book, e.pointerId);
 });
 
 book.addEventListener("pointermove", (e) => {
@@ -460,9 +497,9 @@ book.addEventListener("pointercancel", endDrag);
 /* orbit: drag the stage background to tilt the brochure */
 let orbitDrag = null;
 stage.addEventListener("pointerdown", (e) => {
-  if (e.target.closest("#book, .hint, .tour-caption, button")) return;
+  if (e.target.closest("#book, .hint, .tour-caption, button") || state.pinching) return;
   orbitDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
-  stage.setPointerCapture(e.pointerId);
+  safeCapture(stage, e.pointerId);
 });
 stage.addEventListener("pointermove", (e) => {
   if (!orbitDrag || e.pointerId !== orbitDrag.id) return;
@@ -486,11 +523,62 @@ addEventListener("pointermove", (e) => {
   state.parY.target = -ny * 2.5;
 });
 
+/* ---------------- zoom: wheel, pinch, buttons, keyboard(+/-/0 above) ---------------- */
+
+stage.addEventListener("wheel", (e) => {
+  if (!state.started) return;
+  e.preventDefault();
+  zoomBy(Math.exp(-e.deltaY * 0.0018));
+}, { passive: false });
+
+// pinch-to-zoom: tracked independently of the single-pointer fold-scrub/orbit
+// above (both registered on #book/#stage); a second simultaneous touch takes
+// over from whichever single-pointer gesture is in progress.
+const activeTouches = new Map();
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+
+function touchDist() {
+  const pts = [...activeTouches.values()];
+  return pts.length < 2 ? 0 : Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+}
+
+stage.addEventListener("pointerdown", (e) => {
+  if (e.pointerType !== "touch") return;
+  activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activeTouches.size === 2) {
+    state.pinching = true;
+    drag = null;
+    orbitDrag = null;
+    pinchStartDist = touchDist();
+    pinchStartZoom = state.userZoom.target;
+  }
+});
+stage.addEventListener("pointermove", (e) => {
+  if (!activeTouches.has(e.pointerId)) return;
+  activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (state.pinching && pinchStartDist > 0) {
+    const ratio = touchDist() / pinchStartDist;
+    state.userZoom.target = clamp(pinchStartZoom * ratio, MIN_USER_ZOOM, MAX_USER_ZOOM);
+  }
+});
+function endTouch(e) {
+  activeTouches.delete(e.pointerId);
+  if (activeTouches.size < 2) {
+    state.pinching = false;
+    pinchStartDist = 0;
+  }
+}
+stage.addEventListener("pointerup", endTouch);
+stage.addEventListener("pointercancel", endTouch);
+
 /* ---------------- controls ---------------- */
 
 btnOpen.addEventListener("click", () => { cancelTour(); toggleOpen(); });
 btnFlip.addEventListener("click", () => { cancelTour(); toggleFlip(); });
 btnReset.addEventListener("click", () => { cancelTour(); resetView(); announce("View reset"); });
+$("#btnZoomIn").addEventListener("click", () => { cancelTour(); zoomBy(1.25); });
+$("#btnZoomOut").addEventListener("click", () => { cancelTour(); zoomBy(1 / 1.25); });
 
 btnFullscreen.addEventListener("click", async () => {
   try {
@@ -538,12 +626,20 @@ addEventListener("keydown", (e) => {
     return;
   }
   const tag = document.activeElement?.tagName;
-  if (tag === "BUTTON" || tag === "INPUT" || !$("#modalBackdrop").hidden) return;
+  if (tag === "INPUT" || !$("#modalBackdrop").hidden) return;
   if (!state.started) return;
-  if (e.key === " ") { e.preventDefault(); cancelTour(); toggleOpen(); }
+  // Space is gated on button focus too: a focused button already activates on
+  // Space natively, so firing our own handler as well would double the action.
+  if (e.key === " ") {
+    if (tag === "BUTTON") return;
+    e.preventDefault(); cancelTour(); toggleOpen();
+  }
   else if (e.key === "f" || e.key === "F") { cancelTour(); toggleFlip(); }
   else if (e.key === "r" || e.key === "R") { cancelTour(); resetView(); }
   else if (e.key === "t" || e.key === "T") { btnTour.click(); }
+  else if (e.key === "+" || e.key === "=") { zoomBy(1.25); }
+  else if (e.key === "-" || e.key === "_") { zoomBy(1 / 1.25); }
+  else if (e.key === "0") { state.userZoom.target = 1; }
 });
 
 /* ---------------- modals ---------------- */
@@ -600,9 +696,15 @@ const MODALS = {
   },
   apply: {
     emoji: "✉️",
-    title: "Apply Today",
-    body: `<p>Interested in leading student support services for every learner, every day?
-      Reach out to the District 31 Human Resources team.</p>
+    title: "Application Process",
+    body: `<p>Ready to lead student support services for every learner, every day? Here’s how to apply:</p>
+      <ul>
+        <li>Gather your resume and proof of qualifications.</li>
+        <li>Access the TEACH Portal.</li>
+        <li>Build your candidate profile and complete the application.</li>
+        <li>Apply for open postings.</li>
+        <li>Prepare for a rigorous interview process.</li>
+      </ul>
       <p class="note">The address, phone number, and website shown on the brochure are sample
       placeholders — replace them with the district’s official application details before
       publishing.</p>`,
@@ -615,9 +717,11 @@ const MODALS = {
       <li><strong>F</strong> — flip between inside and outside</li>
       <li><strong>T</strong> — start or stop the auto tour</li>
       <li><strong>R</strong> — reset the camera view</li>
+      <li><strong>+ / − / 0</strong> — zoom in, zoom out, or reset zoom</li>
       <li><strong>Esc</strong> — close dialogs or stop the tour</li>
     </ul>
-    <p>You can also drag the brochure to fold or unfold it, and drag the background to tilt it in 3D.</p>`,
+    <p>You can also drag the brochure to fold or unfold it, drag the background to tilt it in 3D,
+    scroll or pinch to zoom, and use the +/− buttons in the toolbar.</p>`,
   },
 };
 
