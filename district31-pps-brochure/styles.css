@@ -182,11 +182,13 @@ button:focus-visible, [tabindex]:focus-visible {
   width: var(--paper-w);
   height: var(--paper-h);
   position: relative;
+  -webkit-perspective: calc(var(--paper-w) * 2.4);
   perspective: calc(var(--paper-w) * 2.4);
   perspective-origin: 50% 46%;
 }
 .pivot {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -205,6 +207,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .book {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
   font-size: calc(var(--paper-w) / 100); /* 1em = 1% of open sheet width */
@@ -217,6 +220,7 @@ button:focus-visible, [tabindex]:focus-visible {
 .panel {
   position: absolute; top: 0; height: 100%;
   width: calc(100% / 3);
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -226,6 +230,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .bend {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -243,13 +248,24 @@ button:focus-visible, [tabindex]:focus-visible {
   isolation: isolate;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  overflow: hidden;
-  padding: 2.6em 2.1em;
-  display: flex; flex-direction: column;
   /* paper grain + soft edge vignette, layered under each face's own color */
   background-blend-mode: normal;
 }
 .face.back { transform: rotateY(180deg); }
+
+/* Real content lives in this inner, non-rotated wrapper rather than directly in
+   .face. WebKit/Safari has a long-standing bug where overflow other than
+   visible on the SAME element as backface-visibility:hidden breaks backface
+   culling, letting the hidden face show through — mirrored, since you're
+   seeing the front content from behind. Keeping overflow:hidden (needed to
+   clip the bleeding photos/torn edges) off the rotated element avoids it. */
+.face-clip {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 2.6em 2.1em;
+  display: flex; flex-direction: column;
+}
 
 /* subtle paper texture on every face — no z-index: as the first painted layer
    it must stay beneath the real content, not float above it (see isolation note). */

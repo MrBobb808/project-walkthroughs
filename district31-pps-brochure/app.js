@@ -103,6 +103,19 @@ if (!supports3D) {
   $("#intro").classList.add("hide");
 }
 
+/* ---------------- wrap face content for Safari backface-visibility fix ---------------- */
+
+// Moves each face's markup into an inner .face-clip wrapper (see the CSS
+// comment above .face-clip) so overflow:hidden never sits on the same
+// rotated, backface-hidden element — a combination WebKit fails to cull
+// correctly, letting the "hidden" back of a folded panel show through.
+for (const face of $$(".face")) {
+  const clip = document.createElement("div");
+  clip.className = "face-clip";
+  while (face.firstChild) clip.appendChild(face.firstChild);
+  face.appendChild(clip);
+}
+
 /* ---------------- inject dynamic shading layers ---------------- */
 
 for (const face of $$(".panel.left .face, .panel.right .face")) {
@@ -267,6 +280,15 @@ function frame(now) {
     `translate3d(0,0,${liftL.toFixed(2)}px) rotateY(${aL.toFixed(3)}deg) rotateZ(${(fL * -0.55).toFixed(3)}deg)`;
   panelR.style.transform =
     `translate3d(0,0,${liftR.toFixed(2)}px) rotateY(${aR.toFixed(3)}deg) rotateZ(${(fR * 0.4).toFixed(3)}deg)`;
+
+  // When fully closed, panelL's folded-back face and the cover both rotate to
+  // a near-front-facing angle and land on the same screen position — a couple
+  // of px of translateZ separation isn't a reliable way to occlude one with
+  // the other across browsers/GPUs. Explicitly fade panelL out right at the
+  // very end of closing (only when BOTH are nearly folded, so this never
+  // touches the "flap" reveal, where panelL is meant to be seen on its own).
+  const bothClosed = smooth(fL, 0.85, 1) * smooth(fR, 0.85, 1);
+  panelL.style.opacity = (1 - bothClosed).toFixed(3);
 
   // paper flex: velocity lag + a slight resting curl while folded
   const bL = clamp(-state.foldL.v * 7, -6, 6) + fL * 2.0;

@@ -192,11 +192,13 @@ button:focus-visible, [tabindex]:focus-visible {
   width: var(--paper-w);
   height: var(--paper-h);
   position: relative;
+  -webkit-perspective: calc(var(--paper-w) * 2.4);
   perspective: calc(var(--paper-w) * 2.4);
   perspective-origin: 50% 46%;
 }
 .pivot {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -215,6 +217,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .book {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
   font-size: calc(var(--paper-w) / 100); /* 1em = 1% of open sheet width */
@@ -227,6 +230,7 @@ button:focus-visible, [tabindex]:focus-visible {
 .panel {
   position: absolute; top: 0; height: 100%;
   width: calc(100% / 3);
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -236,6 +240,7 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .bend {
   position: absolute; inset: 0;
+  -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -253,13 +258,24 @@ button:focus-visible, [tabindex]:focus-visible {
   isolation: isolate;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  overflow: hidden;
-  padding: 2.6em 2.1em;
-  display: flex; flex-direction: column;
   /* paper grain + soft edge vignette, layered under each face's own color */
   background-blend-mode: normal;
 }
 .face.back { transform: rotateY(180deg); }
+
+/* Real content lives in this inner, non-rotated wrapper rather than directly in
+   .face. WebKit/Safari has a long-standing bug where overflow other than
+   visible on the SAME element as backface-visibility:hidden breaks backface
+   culling, letting the hidden face show through — mirrored, since you're
+   seeing the front content from behind. Keeping overflow:hidden (needed to
+   clip the bleeding photos/torn edges) off the rotated element avoids it. */
+.face-clip {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 2.6em 2.1em;
+  display: flex; flex-direction: column;
+}
 
 /* subtle paper texture on every face — no z-index: as the first painted layer
    it must stay beneath the real content, not float above it (see isolation note). */
@@ -1257,6 +1273,19 @@ if (!supports3D) {
   $("#intro").classList.add("hide");
 }
 
+/* ---------------- wrap face content for Safari backface-visibility fix ---------------- */
+
+// Moves each face's markup into an inner .face-clip wrapper (see the CSS
+// comment above .face-clip) so overflow:hidden never sits on the same
+// rotated, backface-hidden element — a combination WebKit fails to cull
+// correctly, letting the "hidden" back of a folded panel show through.
+for (const face of $$(".face")) {
+  const clip = document.createElement("div");
+  clip.className = "face-clip";
+  while (face.firstChild) clip.appendChild(face.firstChild);
+  face.appendChild(clip);
+}
+
 /* ---------------- inject dynamic shading layers ---------------- */
 
 for (const face of $$(".panel.left .face, .panel.right .face")) {
@@ -1421,6 +1450,15 @@ function frame(now) {
     `translate3d(0,0,${liftL.toFixed(2)}px) rotateY(${aL.toFixed(3)}deg) rotateZ(${(fL * -0.55).toFixed(3)}deg)`;
   panelR.style.transform =
     `translate3d(0,0,${liftR.toFixed(2)}px) rotateY(${aR.toFixed(3)}deg) rotateZ(${(fR * 0.4).toFixed(3)}deg)`;
+
+  // When fully closed, panelL's folded-back face and the cover both rotate to
+  // a near-front-facing angle and land on the same screen position — a couple
+  // of px of translateZ separation isn't a reliable way to occlude one with
+  // the other across browsers/GPUs. Explicitly fade panelL out right at the
+  // very end of closing (only when BOTH are nearly folded, so this never
+  // touches the "flap" reveal, where panelL is meant to be seen on its own).
+  const bothClosed = smooth(fL, 0.85, 1) * smooth(fR, 0.85, 1);
+  panelL.style.opacity = (1 - bothClosed).toFixed(3);
 
   // paper flex: velocity lag + a slight resting curl while folded
   const bL = clamp(-state.foldL.v * 7, -6, 6) + fL * 2.0;
