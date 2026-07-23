@@ -236,6 +236,11 @@ button:focus-visible, [tabindex]:focus-visible {
 
 .face {
   position: absolute; inset: 0;
+  /* isolate: a front face has no transform of its own, so without this it never
+     forms its own stacking context — its z-index:auto children (texture, photos,
+     badges) would escape and interleave with the neighboring face/panel, which is
+     what was reading as pages "ghosting" through one another. */
+  isolation: isolate;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   overflow: hidden;
@@ -246,10 +251,11 @@ button:focus-visible, [tabindex]:focus-visible {
 }
 .face.back { transform: rotateY(180deg); }
 
-/* subtle paper texture on every face */
+/* subtle paper texture on every face — no z-index: as the first painted layer
+   it must stay beneath the real content, not float above it (see isolation note). */
 .face::before {
   content: "";
-  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  position: absolute; inset: 0; pointer-events: none;
   background-image:
     repeating-linear-gradient(93deg, rgba(255,255,255,.05) 0 2px, transparent 2px 5px),
     repeating-linear-gradient(2deg, rgba(120,90,20,.028) 0 3px, transparent 3px 7px),
@@ -685,6 +691,23 @@ button:focus-visible, [tabindex]:focus-visible {
 .control[aria-pressed="true"] {
   background: var(--navy); color: #fff; border-color: var(--navy);
 }
+.zoom-rocker {
+  display: flex; align-items: stretch;
+  border-radius: 999px; overflow: hidden;
+  background: rgba(255,255,255,.75); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 6px 16px rgba(30,52,104,.12);
+}
+.zoom-btn {
+  display: grid; place-items: center;
+  width: 38px; height: 38px;
+  font-size: 17px; font-weight: 900; line-height: 1; color: var(--navy);
+  transition: background .18s;
+}
+.zoom-btn:first-child { border-right: 1px solid rgba(30,52,104,.14); }
+.zoom-btn:hover { background: rgba(30,52,104,.1); }
+.zoom-btn:active { background: rgba(30,52,104,.18); }
+
 .more-wrap { position: relative; }
 .more-menu {
   position: absolute; right: 0; bottom: calc(100% + 8px);
