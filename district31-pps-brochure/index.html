@@ -2,140 +2,242 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f7e487">
-<meta name="description" content="Interactive 3D tri-fold District 31 PPS Director brochure.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f9e88f">
+<meta name="description" content="Interactive 3D tri-fold brochure — Pupil Personnel Services (PPS) Director, District 31, Staten Island, New York City Public Schools.">
 <title>District 31 PPS Director — Interactive 3D Brochure</title>
-<style>
-*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f7e487}iframe{display:block;width:100%;height:100%;border:0;background:#f7e487}
-.loading{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 20% 15%,#fff,transparent 28%),linear-gradient(145deg,#fff8d7,#f7e487);font:800 16px system-ui;color:#20366b;z-index:2;transition:.35s}.loading.hide{opacity:0;visibility:hidden}.spinner{width:42px;height:42px;border-radius:50%;border:5px solid rgba(32,54,107,.15);border-top-color:#ff6817;animation:spin .8s linear infinite;margin:0 auto 14px}@keyframes spin{to{transform:rotate(360deg)}}
-</style>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+<link rel="preload" href="./assets/fonts/Baloo2.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./assets/fonts/Nunito.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<div class="loading" id="loading"><div><div class="spinner"></div>Preparing the brochure…</div></div>
-<iframe id="brochureFrame" title="District 31 interactive tri-fold brochure" src="https://raw.githack.com/MrBobb808/project-walkthroughs/a6e857b70c74efc89535dbd56e3eeadac2c4035c/district31-pps-brochure/index.html"></iframe>
-<script>
-(() => {
-  const frame = document.getElementById('brochureFrame');
-  const loading = document.getElementById('loading');
 
-  frame.addEventListener('load', () => {
-    const win = frame.contentWindow;
-    const doc = frame.contentDocument;
-    if (!doc) return;
+<div class="app" id="app">
 
-    const style = doc.createElement('style');
-    style.textContent = `
-      :root{--paper-w:1100px!important;--paper-h:850px!important;--panel-w:calc(var(--paper-w)/3)!important}
-      html,body{width:100%!important;height:100%!important;overflow:hidden!important}
-      .app{height:100dvh!important;grid-template-rows:auto minmax(0,1fr) auto!important}
-      .topbar{padding:12px clamp(14px,2.3vw,30px)!important}
-      .workspace{min-height:0!important;padding:4px 14px 5px!important;overflow:hidden!important}
-      .scene{width:var(--paper-w)!important;height:var(--paper-h)!important;perspective:2600px!important;transition:transform .25s ease!important}
-      .brochure{transform-style:preserve-3d!important;filter:drop-shadow(0 26px 30px rgba(32,54,107,.24))!important}
-      .sheet,.panel{transform-style:preserve-3d!important}
-      .panel{transition:none!important;will-change:transform!important}
-      .controls{padding:7px 10px 11px!important;gap:7px!important}
-      .control{padding:9px 13px!important}
-      .floaty{opacity:.42!important}
-      .panel:before{content:"";position:absolute;inset:0;z-index:7;pointer-events:none;opacity:.26;background:linear-gradient(90deg,rgba(255,255,255,.25),transparent 8%,transparent 91%,rgba(25,42,78,.2));mix-blend-mode:soft-light}
-      .panel:not(:last-child):after{width:3px!important;right:-1px!important;box-shadow:4px 0 13px rgba(22,35,67,.22)!important}
-      .cover-card{transform-style:preserve-3d!important;box-shadow:8px 9px 0 rgba(255,255,255,.45),16px 18px 0 rgba(32,54,107,.09),0 28px 54px rgba(32,54,107,.28)!important}
+  <!-- ============ Top bar ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🏫</span>
+      <span class="brand-copy">
+        <strong>District 31 · Staten Island</strong>
+        <span>Pupil Personnel Services (PPS) Director</span>
+      </span>
+    </div>
+    <div class="status" id="statusPill">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="statusText">Folded</span>
+    </div>
+  </header>
 
-      .brochure.unfolding .cover-card{animation:coverPeel 760ms cubic-bezier(.2,.88,.18,1) both!important}
-      .brochure.unfolding .panel.p1{animation:paperOpenLeft 1080ms cubic-bezier(.18,.96,.2,1.08) both 80ms!important}
-      .brochure.unfolding .panel.p3{animation:paperOpenRight 1180ms cubic-bezier(.18,.96,.2,1.08) both 220ms!important}
-      .brochure.folding .panel.p1{animation:paperCloseLeft 900ms cubic-bezier(.24,.74,.18,1) both 80ms!important}
-      .brochure.folding .panel.p3{animation:paperCloseRight 930ms cubic-bezier(.24,.74,.18,1) both!important}
+  <!-- ============ 3D stage ============ -->
+  <main class="stage" id="stage" aria-label="Interactive 3D brochure stage">
+    <div class="ambient" aria-hidden="true">
+      <span class="floaty" style="left:4%;top:12%">📚</span>
+      <span class="floaty" style="right:5%;top:16%">✏️</span>
+      <span class="floaty" style="left:7%;bottom:14%">🖍️</span>
+      <span class="floaty" style="right:8%;bottom:12%">🌍</span>
+      <span class="floaty" style="left:47%;top:3%">📎</span>
+    </div>
 
-      @keyframes coverPeel{
-        0%{opacity:1;transform:translate(-50%,-50%) rotateY(0) rotateZ(-.25deg) translateZ(18px)}
-        45%{opacity:1;transform:translate(-26%,-50%) rotateY(-48deg) rotateZ(1.4deg) translateZ(42px)}
-        100%{opacity:0;transform:translate(34%,-50%) rotateY(-83deg) rotateZ(3deg) translateZ(16px) scale(.95)}
-      }
-      @keyframes paperOpenLeft{
-        0%{transform:translateX(var(--panel-w)) rotateY(179.6deg) translateZ(3px)}
-        56%{transform:translateX(-1.7%) rotateY(-7deg) translateZ(10px)}
-        78%{transform:translateX(.7%) rotateY(2.5deg) translateZ(4px)}
-        100%{transform:translateX(0) rotateY(0) translateZ(0)}
-      }
-      @keyframes paperOpenRight{
-        0%{transform:translateX(calc(var(--panel-w)*-1)) rotateY(-179.6deg) translateZ(2px)}
-        54%{transform:translateX(1.9%) rotateY(8deg) translateZ(11px)}
-        78%{transform:translateX(-.7%) rotateY(-2.7deg) translateZ(4px)}
-        100%{transform:translateX(0) rotateY(0) translateZ(0)}
-      }
-      @keyframes paperCloseLeft{
-        0%{transform:translateX(0) rotateY(0) translateZ(0)}
-        35%{transform:translateX(-.8%) rotateY(-4deg) translateZ(6px)}
-        100%{transform:translateX(var(--panel-w)) rotateY(179.6deg) translateZ(3px)}
-      }
-      @keyframes paperCloseRight{
-        0%{transform:translateX(0) rotateY(0) translateZ(0)}
-        35%{transform:translateX(.8%) rotateY(4deg) translateZ(6px)}
-        100%{transform:translateX(calc(var(--panel-w)*-1)) rotateY(-179.6deg) translateZ(2px)}
-      }
+    <div class="scene" id="scene">
+      <div class="pivot" id="pivot">
+        <div class="contact-shadow" id="contactShadow" aria-hidden="true"></div>
 
-      @media(max-width:760px){
-        .topbar{padding:9px 11px!important}.controls{padding:5px 6px 9px!important}.control{padding:8px 10px!important;font-size:11px!important}
-      }
-    `;
-    doc.head.appendChild(style);
+        <div class="book" id="book" role="group" aria-label="Tri-fold brochure. Click or press Enter to open and close." tabindex="0" data-view="folded">
 
-    const brochure = doc.getElementById('brochure');
-    const scene = doc.getElementById('scene');
-    const workspace = doc.querySelector('.workspace');
-    const openBtn = doc.getElementById('openBtn');
-    const coverHint = doc.getElementById('coverHint');
-    const launch = doc.getElementById('launch');
+          <!-- ====== LEFT PANEL — inside: hiring cover art / outside: Do You Qualify flap ====== -->
+          <section class="panel left" id="panelL">
+            <div class="bend" id="bendL">
 
-    function fit() {
-      if (!workspace || !scene) return;
-      const r = workspace.getBoundingClientRect();
-      const ratio = 1.294;
-      const maxW = Math.max(300, r.width - 34);
-      const maxH = Math.max(250, r.height - 20);
-      let w = Math.min(maxW, maxH * ratio);
-      let h = w / ratio;
-      if (h > maxH) { h = maxH; w = h * ratio; }
-      doc.documentElement.style.setProperty('--paper-w', w + 'px', 'important');
-      doc.documentElement.style.setProperty('--paper-h', h + 'px', 'important');
-      doc.documentElement.style.setProperty('--panel-w', (w / 3) + 'px', 'important');
-    }
+              <div class="face front face-inside-left">
+                <div class="blob-sky" aria-hidden="true"></div>
+                <div class="arch-head">
+                  <svg class="arch" viewBox="0 0 340 178" aria-hidden="true">
+                    <path id="archPath" d="M 22 172 A 156 156 0 0 1 318 172" fill="none"></path>
+                    <text class="arch-text"><textPath href="#archPath" startOffset="50%" text-anchor="middle">Pre-Elementary School Job Offer</textPath></text>
+                  </svg>
+                  <span class="school-emoji" aria-hidden="true">🏫</span>
+                </div>
+                <h2 class="bubble-title">Pupil Personnel Services (PPS)<br>Director</h2>
+                <figure class="photo building-photo"><img src="./assets/building.webp" alt="District 31 school building"></figure>
+                <div class="hiring-cloud">
+                  <strong>NOW HIRING</strong>
+                  <span>2026–2027</span>
+                  <em>District 31 · Staten Island</em>
+                </div>
+                <div class="navy-pill">
+                  <span>New York City Public Schools</span>
+                  <strong>Leading Student Support Services for Every Learner, Every Day!</strong>
+                </div>
+              </div>
 
-    function animateFold() {
-      if (!brochure) return;
-      const opening = !brochure.classList.contains('open');
-      brochure.classList.remove('unfolding','folding');
-      void brochure.offsetWidth;
-      brochure.classList.add(opening ? 'unfolding' : 'folding');
-      win.setTimeout(() => brochure.classList.remove('unfolding','folding'), 1320);
-    }
+              <div class="face back face-outside-left">
+                <div class="mini-badge" aria-hidden="true">
+                  <svg viewBox="0 0 200 200">
+                    <defs><path id="miniCircle" d="M 100 178 A 78 78 0 1 1 100.01 178"></path></defs>
+                    <text class="ring-text-sm"><textPath href="#miniCircle">Pre-Elementary School Job Offer · PPS Director ·</textPath></text>
+                  </svg>
+                  <span class="mini-badge-emoji">🏫</span>
+                </div>
+                <figure class="photo torn torn-tr"><img src="./assets/craft-watercolor.webp" alt="Children painting with watercolors"></figure>
+                <h2 class="ink-title">Do You Qualify?</h2>
+                <ul class="dot-list ink">
+                  <li>New York State School District Leader (SDL/SBL) certification.</li>
+                  <li>Master’s degree in Educational Leadership or a related field.</li>
+                  <li>Knowledge of special education law (IDEA, Section 504).</li>
+                  <li>Experience supervising support personnel.</li>
+                  <li>Strong communication and leadership skills.</li>
+                  <li>Committed to equity and student success.</li>
+                </ul>
+                <figure class="photo torn torn-bl"><img src="./assets/craft-table.webp" alt="Craft table with drawings, markers and scissors"></figure>
+                <button class="hotspot" data-modal="qualifications" aria-label="More about qualifications"></button>
+              </div>
 
-    [openBtn, coverHint].filter(Boolean).forEach(el => el.addEventListener('click', animateFold, true));
-    if (launch) launch.addEventListener('click', () => {
-      win.setTimeout(() => {
-        brochure.classList.remove('unfolding','folding');
-        void brochure.offsetWidth;
-        brochure.classList.add('unfolding');
-        win.setTimeout(() => brochure.classList.remove('unfolding'), 1320);
-      }, 285);
-    }, true);
+            </div>
+          </section>
 
-    doc.addEventListener('keydown', e => {
-      if (e.code === 'Space' && !doc.body.dataset.modal) animateFold();
-    }, true);
+          <!-- ====== CENTER PANEL — inside: mission / outside: District 31 + benefits ====== -->
+          <section class="panel center" id="panelC">
+            <div class="bend" id="bendC">
 
-    const resize = new win.ResizeObserver(fit);
-    resize.observe(workspace);
-    win.addEventListener('resize', fit);
-    fit();
-    win.setTimeout(fit, 150);
-    win.setTimeout(fit, 700);
+              <div class="face front face-inside-center">
+                <div class="deco-books" aria-hidden="true">📗📘📙</div>
+                <p class="equity-line">Do you look at student success through an <strong>equity lens</strong>?</p>
+                <h2 class="join-title">Join Our Team</h2>
+                <h3 class="mission-title">Our Mission</h3>
+                <p class="mission-copy">We believe every student deserves <strong>safety</strong>, <strong>social-emotional support</strong>, <strong>equity</strong>, and <strong>college-and-career readiness</strong>.</p>
+                <div class="soft-card">
+                  <h4 class="who-title">Who is a Pupil Personnel Services (PPS) Administrator?</h4>
+                  <p>A PPS Administrator provides <strong>leadership and oversight</strong> for student support services to promote <strong>equity and compliance</strong>.</p>
+                </div>
+                <div class="deco-row" aria-hidden="true">📐 ✂️ 🖊️</div>
+                <button class="hotspot" data-modal="mission" aria-label="More about our mission"></button>
+              </div>
 
-    loading.classList.add('hide');
-  });
-})();
-</script>
+              <div class="face back face-outside-center">
+                <h2 class="panel-title-light">(PPS) Job Offer<br><span>District 31</span></h2>
+                <ul class="dot-list light tight">
+                  <li>District 31 serves thousands of students throughout Staten Island and is committed to providing equitable, inclusive, high-quality educational opportunities for every learner.</li>
+                  <li>Our schools foster academic excellence, student wellness, family partnership, safe learning environments, and inclusive practices.</li>
+                </ul>
+                <h3 class="gold-title">Why Work With Our District?<br><span>We offer:</span></h3>
+                <ul class="check-list">
+                  <li>Competitive Salary</li>
+                  <li>Excellent Benefits</li>
+                  <li>Professional Development</li>
+                  <li>Mentorship Opportunities</li>
+                  <li>Diverse School Community</li>
+                  <li>Collaborative Leadership</li>
+                </ul>
+                <figure class="photo torn torn-bc"><img src="./assets/craft-marker.webp" alt="Child coloring with a red marker"></figure>
+                <button class="hotspot" data-modal="benefits" aria-label="More about benefits"></button>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- ====== RIGHT PANEL — inside: responsibilities / outside: FRONT COVER ====== -->
+          <section class="panel right" id="panelR">
+            <div class="bend" id="bendR">
+
+              <div class="face front face-inside-right">
+                <div class="deco-top" aria-hidden="true">🖍️ 📌 📎</div>
+                <h2 class="panel-title-light">(PPS) Position<br>Responsibilities</h2>
+                <ul class="dot-list light tight">
+                  <li>Provides visionary leadership for all student support services throughout the district.</li>
+                  <li>Analyzes data to improve student outcomes.</li>
+                  <li>Promotes Multi-Tiered Systems of Support (MTSS).</li>
+                  <li>Works collaboratively with principals, teachers, families, and community agencies, and coordinates with special education stakeholders to remove barriers to student success.</li>
+                  <li>Develops programs that promote equity, compliance, and inclusion.</li>
+                  <li>Supervises attendance programs and community partnerships so every student is set up for success.</li>
+                  <li>Oversees crisis response and intervention.</li>
+                </ul>
+                <div class="deco-bottom" aria-hidden="true">🌍 🍎 📚</div>
+                <button class="hotspot" data-modal="responsibilities" aria-label="More about position responsibilities"></button>
+              </div>
+
+              <div class="face back face-cover">
+                <div class="cover-ring" aria-hidden="true">
+                  <svg viewBox="0 0 300 300">
+                    <defs><path id="coverCircle" d="M 150 272 A 122 122 0 1 1 150.01 272"></path></defs>
+                    <text class="ring-text"><textPath href="#coverCircle">Pre-Elementary School Job Offer ★ Pupil Personnel Services (PPS) Director ★</textPath></text>
+                  </svg>
+                  <span class="cover-emoji">🏫</span>
+                </div>
+                <figure class="photo cover-photo"><img src="./assets/building.webp" alt=""></figure>
+                <div class="cover-cta">
+                  <div class="apply-pill">APPLY TODAY!</div>
+                  <div class="contact-pill">123 NYC St., Equity City, ST 08863</div>
+                  <div class="contact-pill stack">
+                    <span>Contact Human Resources</span>
+                    <span>555-555-5555</span>
+                    <span>www.EquityMatters.org</span>
+                  </div>
+                  <p class="placeholder-note">Sample contact details — replace with official district information.</p>
+                </div>
+                <button class="hotspot" data-modal="apply" aria-label="How to apply"></button>
+              </div>
+
+            </div>
+          </section>
+
+        </div><!-- /book -->
+      </div><!-- /pivot -->
+    </div><!-- /scene -->
+
+    <button class="hint" id="hint" hidden>👆 Tap the brochure to open it</button>
+    <div class="tour-caption" id="tourCaption" hidden></div>
+  </main>
+
+  <!-- ============ Controls ============ -->
+  <footer class="controls" id="controls">
+    <button class="control primary" id="btnOpen" aria-keyshortcuts="Space">📖 <span>Open</span></button>
+    <button class="control" id="btnFlip" aria-pressed="false">🔄 <span>Outside</span></button>
+    <button class="control" id="btnTour" aria-pressed="false">✨ <span>Auto Tour</span></button>
+    <button class="control" id="btnReset">🎯 <span>Reset View</span></button>
+    <button class="control" id="btnFullscreen">⛶ <span>Fullscreen</span></button>
+    <div class="more-wrap">
+      <button class="control" id="btnMore" aria-haspopup="true" aria-expanded="false">⋯<span class="sr-only">More options</span></button>
+      <div class="more-menu" id="moreMenu" hidden>
+        <button class="menu-item" id="btnPrint">🖨️ Print brochure</button>
+        <button class="menu-item" id="btnHelp">⌨️ Keyboard shortcuts</button>
+      </div>
+    </div>
+  </footer>
+
+  <p class="sr-only" role="status" aria-live="polite" id="announcer"></p>
+</div>
+
+<!-- ============ Intro overlay ============ -->
+<div class="intro" id="intro">
+  <div class="intro-card">
+    <div class="intro-emoji" aria-hidden="true">🏫</div>
+    <p class="intro-kicker">New York City Public Schools · District 31 · Staten Island</p>
+    <h1>Pupil Personnel Services<br><span>(PPS) Director</span></h1>
+    <p class="intro-sub">A recruitment brochure you can pick up, unfold, and explore — just like the printed one.</p>
+    <button class="start-btn" id="btnStart">Start Exploring</button>
+  </div>
+</div>
+
+<!-- ============ Modal ============ -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" id="modal">
+    <button class="modal-close" id="modalClose" aria-label="Close dialog">✕</button>
+    <div class="modal-emoji" id="modalEmoji" aria-hidden="true"></div>
+    <h2 id="modalTitle"></h2>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ============ Print layout (hidden on screen) ============ -->
+<section class="print-sheet" id="printSheet" aria-hidden="true"></section>
+
+<!-- ============ No-3D fallback note ============ -->
+<div class="no3d-note" id="no3dNote" hidden>
+  Your browser doesn’t support 3D transforms, so the brochure is shown as flat pages below.
+</div>
+
+<script type="module" src="./app.js"></script>
 </body>
 </html>
