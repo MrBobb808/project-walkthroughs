@@ -137,6 +137,7 @@ const state = {
   parY: new Spring(0, 80, 1),
   orbit: { yaw: 0, pitch: 0 },
   paperW: 900,
+  foldedZoom: 1.1,
   view: "folded",
   opened: false, // opened at least once (hides hint)
   touring: false,
@@ -148,16 +149,29 @@ const state = {
 const SHEET_RATIO = 2001 / 1545; // three 667x1545 panels side by side
 
 function fit() {
-  const w = stage.clientWidth;
+  // Use the true viewport width, not stage.clientWidth: a large scene can grow
+  // the grid column and report back an inflated stage width (a feedback loop).
+  const vw = document.documentElement.clientWidth || innerWidth;
+  const w = Math.min(stage.clientWidth, vw);
   const h = stage.clientHeight;
   if (!w || !h) return;
-  // breathing room + head-room for the folded-state zoom & 3D tilt overhang
-  const availW = w * 0.9;
+  // Size the paper so the *open* three-panel spread always fits (its width is
+  // the binding constraint). Narrow screens may use a touch more width; a cap
+  // keeps the brochure crisp and composed on very large displays.
+  const availW = w * (w < 560 ? 0.95 : 0.9);
   const availH = h * 0.86;
-  let paperW = Math.min(availW, availH * SHEET_RATIO);
-  paperW = Math.max(paperW, 240);
+  let paperW = Math.min(availW, availH * SHEET_RATIO, 1360);
+  paperW = Math.max(paperW, 232);
   const paperH = paperW / SHEET_RATIO;
   state.paperW = paperW;
+  // How much bigger the single folded cover can be drawn to fill the stage —
+  // large on tall/portrait screens where the open-spread size leaves headroom.
+  const panelW = paperW / 3;
+  state.foldedZoom = clamp(
+    Math.min((w * 0.82) / panelW, (h * 0.82) / paperH),
+    1,
+    2.15
+  );
   const root = document.documentElement;
   root.style.setProperty("--paper-w", paperW.toFixed(1) + "px");
   root.style.setProperty("--paper-h", paperH.toFixed(1) + "px");
@@ -173,7 +187,11 @@ function cameraTargets() {
   const open = clamp(state.p.x / 2, 0, 1);
   let yaw = lerp(-24, -6, open);
   let pitch = lerp(7, 3.5, open);
-  let zoom = lerp(1.1, 1, open);
+  // Folded state fills the stage (big on portrait); eases to 1x as it opens so
+  // the full spread fits. `open` here means fully unfolded, so cover the first
+  // half of the fold with the folded zoom, then settle to 1.
+  const foldedZoom = state.foldedZoom || 1.1;
+  let zoom = lerp(foldedZoom, 1, clamp(state.p.x / 1.15, 0, 1));
   if (state.flip.x > 0.04) {
     // frontal, slightly higher view for the outside spread
     yaw = lerp(yaw, 6, state.flip.x);
