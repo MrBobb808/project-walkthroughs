@@ -600,9 +600,15 @@ const MODALS = {
   },
   apply: {
     emoji: "✉️",
-    title: "Apply Today",
-    body: `<p>Interested in leading student support services for every learner, every day?
-      Reach out to the District 31 Human Resources team.</p>
+    title: "Application Process",
+    body: `<p>Ready to lead student support services for every learner, every day? Here’s how to apply:</p>
+      <ul>
+        <li>Gather your resume and proof of qualifications.</li>
+        <li>Access the TEACH Portal.</li>
+        <li>Build your candidate profile and complete the application.</li>
+        <li>Apply for open postings.</li>
+        <li>Prepare for a rigorous interview process.</li>
+      </ul>
       <p class="note">The address, phone number, and website shown on the brochure are sample
       placeholders — replace them with the district’s official application details before
       publishing.</p>`,
